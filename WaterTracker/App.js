@@ -2899,49 +2899,54 @@ const histSt = StyleSheet.create({
   dayBarFill:   { height: '100%', borderRadius: 2 },
   entryPill:    { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: 'rgba(79,142,247,0.12)', borderRadius: RADIUS.round, paddingHorizontal: 7, paddingVertical: 3, borderWidth: 1, borderColor: 'rgba(79,142,247,0.22)' },
 });
+// ============================================================
+// REMINDERS SCREEN
+// ============================================================
 const RemindersScreen = ({ reminderPrefs, onSave, onNavigate }) => {
   const insets = useSafeAreaInsets();
-  const [enabled, setEnabled] = useState(reminderPrefs?.enabled ?? true);
-  const [interval, setInterval] = useState(reminderPrefs?.intervalMins ?? 90);
-  const [startHour, setStartHour] = useState(reminderPrefs?.startHour ?? 8);
-  const [endHour, setEndHour] = useState(reminderPrefs?.endHour ?? 22);
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
 
-  const headerY = useRef(new Animated.Value(-20)).current;
-  const headerOp = useRef(new Animated.Value(0)).current;
-  const toggleScale = useRef(new Animated.Value(1)).current;
-  const saveScale = useRef(new Animated.Value(1)).current;
-  const savedOp = useRef(new Animated.Value(0)).current;
+  const [enabled,   setEnabled]   = useState(reminderPrefs?.enabled      ?? true);
+  const [interval,  setInterval]  = useState(reminderPrefs?.intervalMins ?? 90);
+  const [startHour, setStartHour] = useState(reminderPrefs?.startHour    ?? 8);
+  const [endHour,   setEndHour]   = useState(reminderPrefs?.endHour      ?? 22);
+  const [saving,    setSaving]    = useState(false);
+  const [saved,     setSaved]     = useState(false);
+
+  const headerY   = useRef(new Animated.Value(-20)).current;
+  const headerOp  = useRef(new Animated.Value(0)).current;
+  const toggleSc  = useRef(new Animated.Value(1)).current;
+  const savedOp   = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     Animated.parallel([
-      Animated.timing(headerY, { toValue: 0, duration: 500, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+      Animated.timing(headerY,  { toValue: 0, duration: 500, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
       Animated.timing(headerOp, { toValue: 1, duration: 500, useNativeDriver: true }),
     ]).start();
   }, []);
 
   const INTERVALS = [
-    { label: 'Every 1hr', mins: 60 }, { label: 'Every 2hr', mins: 120 },
-    { label: 'Every 3hr', mins: 180 }, { label: 'Every 4hr', mins: 240 },
+    { label: 'Every 1hr', mins: 60  },
+    { label: 'Every 2hr', mins: 120 },
+    { label: 'Every 3hr', mins: 180 },
+    { label: 'Every 4hr', mins: 240 },
   ];
 
-  const startHours = Array.from({ length: 12 }, (_, i) => i + 6);
-  const endHours = Array.from({ length: 12 }, (_, i) => i + 14);
+  const startHours = Array.from({ length: 12 }, (_, i) => i + 6);   // 6 AM – 5 PM
+  const endHours   = Array.from({ length: 12 }, (_, i) => i + 14);  // 2 PM – 1 AM
 
   const formatHour = (h) => {
     const ampm = h >= 12 ? 'PM' : 'AM';
-    const h12 = h > 12 ? h - 12 : h === 0 ? 12 : h;
+    const h12  = h > 12 ? h - 12 : h === 0 ? 12 : h;
     return `${h12}:00 ${ampm}`;
   };
 
-  const totalMins = endHour * 60 - startHour * 60;
+  const totalMins      = endHour * 60 - startHour * 60;
   const remindersCount = Math.max(0, Math.floor(totalMins / interval));
 
   const handleToggle = (val) => {
     Animated.sequence([
-      Animated.timing(toggleScale, { toValue: 0.9, duration: 80, useNativeDriver: true }),
-      Animated.spring(toggleScale, { toValue: 1, tension: 100, friction: 5, useNativeDriver: true }),
+      Animated.timing(toggleSc, { toValue: 0.9, duration: 80, useNativeDriver: true }),
+      Animated.spring(toggleSc, { toValue: 1, tension: 100, friction: 5, useNativeDriver: true }),
     ]).start();
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setEnabled(val);
@@ -2949,24 +2954,28 @@ const RemindersScreen = ({ reminderPrefs, onSave, onNavigate }) => {
 
   const handleSave = async () => {
     setSaving(true);
-    Animated.sequence([
-      Animated.timing(saveScale, { toValue: 0.95, duration: 80, useNativeDriver: true }),
-      Animated.spring(saveScale, { toValue: 1, tension: 80, friction: 5, useNativeDriver: true }),
-    ]).start();
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-
     const prefs = { enabled, intervalMins: interval, startHour, endHour, sound: true, vibration: true };
+
     try {
       await AsyncStorage.setItem(STORAGE_KEYS.REMINDER_PREFS, JSON.stringify(prefs));
-      // Cancel existing, schedule new if enabled
       await Notifications.cancelAllScheduledNotificationsAsync();
+
       if (enabled && remindersCount > 0) {
         for (let i = 0; i < remindersCount; i++) {
-          const triggerMin = startHour * 60 + interval * (i + 1);
-          if (triggerMin < endHour * 60) {
+          const trigMin = startHour * 60 + interval * (i + 1);
+          if (trigMin < endHour * 60) {
             await Notifications.scheduleNotificationAsync({
-              content: { title: '💧 HydroTrack', body: "Time to hydrate! Don't forget to drink some water.", sound: true },
-              trigger: { hour: Math.floor(triggerMin / 60), minute: triggerMin % 60, repeats: true },
+              content: {
+                title: '💧 HydroTrack',
+                body:  "Time to hydrate! Don't forget to drink some water.",
+                sound: true,
+              },
+              trigger: {
+                hour:    Math.floor(trigMin / 60),
+                minute:  trigMin % 60,
+                repeats: true,
+              },
             });
           }
         }
@@ -2978,23 +2987,32 @@ const RemindersScreen = ({ reminderPrefs, onSave, onNavigate }) => {
     setSaved(true);
     Animated.timing(savedOp, { toValue: 1, duration: 300, useNativeDriver: true }).start();
     setTimeout(() => {
-      Animated.timing(savedOp, { toValue: 0, duration: 300, useNativeDriver: true }).start(() => setSaved(false));
-    }, 2000);
+      Animated.timing(savedOp, { toValue: 0, duration: 300, useNativeDriver: true })
+        .start(() => setSaved(false));
+    }, 2200);
   };
 
   return (
     <View style={{ flex: 1, backgroundColor: COLORS.bg }}>
       <StatusBar barStyle="light-content" />
       <SafeAreaView style={{ flex: 1 }}>
-        <ScrollView contentContainerStyle={[remSt.scroll, { paddingBottom: 90 + insets.bottom }]} showsVerticalScrollIndicator={false}>
-
-          <Animated.View style={[remSt.pageHdr, { transform: [{ translateY: headerY }], opacity: headerOp }]}>
+        <ScrollView
+          contentContainerStyle={[remSt.scroll, { paddingBottom: 90 + insets.bottom }]}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Header */}
+          <Animated.View style={[remSt.pageHdr, {
+            transform: [{ translateY: headerY }], opacity: headerOp,
+          }]}>
             <View>
               <Text style={remSt.pageTitle}>Reminders</Text>
               <Text style={remSt.pageSub}>Stay hydrated with smart notifications</Text>
             </View>
-            <View style={[remSt.headerIcon, { borderColor: COLORS.blue + '33' }]}>
-              <LinearGradient colors={[COLORS.blue + '22', COLORS.blue + '0a']} style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}>
+            <View style={remSt.headerIcon}>
+              <LinearGradient
+                colors={['rgba(79,142,247,0.18)', 'rgba(79,142,247,0.06)']}
+                style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}
+              >
                 <Ionicons name="notifications" size={18} color={COLORS.blue} />
               </LinearGradient>
             </View>
@@ -3008,7 +3026,7 @@ const RemindersScreen = ({ reminderPrefs, onSave, onNavigate }) => {
                   <Text style={remSt.settingTitle}>Enable Reminders</Text>
                   <Text style={remSt.settingDesc}>Receive hydration nudges throughout the day</Text>
                 </View>
-                <Animated.View style={{ transform: [{ scale: toggleScale }] }}>
+                <Animated.View style={{ transform: [{ scale: toggleSc }] }}>
                   <Switch
                     value={enabled}
                     onValueChange={handleToggle}
@@ -3021,10 +3039,10 @@ const RemindersScreen = ({ reminderPrefs, onSave, onNavigate }) => {
             </LinearGradient>
           </View>
 
-          {/* Content */}
+          {/* Dimmed when disabled */}
           <Animated.View style={{ opacity: enabled ? 1 : 0.4 }} pointerEvents={enabled ? 'auto' : 'none'}>
 
-            {/* Interval Selector */}
+            {/* Interval selector */}
             <View style={remSt.sectionHdr}>
               <Text style={remSt.sectionTitle}>Reminder Interval</Text>
               <View style={remSt.sectionLine} />
@@ -3035,13 +3053,23 @@ const RemindersScreen = ({ reminderPrefs, onSave, onNavigate }) => {
                   {INTERVALS.map(iv => {
                     const sel = interval === iv.mins;
                     return (
-                      <PressScale key={iv.mins} onPress={() => setInterval(iv.mins)} style={remSt.intervalBtn}>
+                      <PressScale
+                        key={iv.mins}
+                        onPress={() => setInterval(iv.mins)}
+                        style={remSt.intervalBtn}
+                      >
                         <LinearGradient
-                          colors={sel ? [COLORS.blue + '33', COLORS.blue + '15'] : [COLORS.cardHover, COLORS.card]}
-                          style={[remSt.intervalBtnGrad, { borderColor: sel ? COLORS.blue : COLORS.cardBorder }]}
+                          colors={sel
+                            ? ['rgba(79,142,247,0.25)', 'rgba(79,142,247,0.1)']
+                            : [COLORS.cardHover, COLORS.card]}
+                          style={[remSt.intervalBtnGrad, {
+                            borderColor: sel ? COLORS.blue : COLORS.cardBorder,
+                          }]}
                         >
                           <Ionicons name="time-outline" size={18} color={sel ? COLORS.blue : COLORS.subtext} />
-                          <Text style={[remSt.intervalLabel, { color: sel ? COLORS.blue : COLORS.subtext }]}>{iv.label}</Text>
+                          <Text style={[remSt.intervalLabel, { color: sel ? COLORS.blue : COLORS.subtext }]}>
+                            {iv.label}
+                          </Text>
                         </LinearGradient>
                       </PressScale>
                     );
@@ -3050,30 +3078,41 @@ const RemindersScreen = ({ reminderPrefs, onSave, onNavigate }) => {
               </LinearGradient>
             </View>
 
-            {/* Time Range */}
+            {/* Active hours */}
             <View style={remSt.sectionHdr}>
               <Text style={remSt.sectionTitle}>Active Hours</Text>
               <View style={remSt.sectionLine} />
             </View>
             <View style={remSt.card}>
               <LinearGradient colors={[COLORS.card, COLORS.bg]} style={remSt.cardGrad}>
-                {/* Start Time */}
+
+                {/* Start time */}
                 <View style={remSt.timeSection}>
                   <View style={remSt.timeLabelRow}>
                     <Ionicons name="sunny-outline" size={16} color={COLORS.orange} />
                     <Text style={remSt.timeLabel}>Start Time</Text>
                     <Text style={remSt.timeValue}>{formatHour(startHour)}</Text>
                   </View>
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={remSt.timeScroll}>
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={remSt.timeScroll}
+                  >
                     {startHours.map(h => {
                       const sel = startHour === h;
                       return (
                         <PressScale key={h} onPress={() => setStartHour(h)}>
                           <LinearGradient
-                            colors={sel ? [COLORS.orange + '33', COLORS.orange + '15'] : [COLORS.cardHover, COLORS.card]}
-                            style={[remSt.timeChip, { borderColor: sel ? COLORS.orange : COLORS.cardBorder }]}
+                            colors={sel
+                              ? ['rgba(255,152,0,0.25)', 'rgba(255,152,0,0.1)']
+                              : [COLORS.cardHover, COLORS.card]}
+                            style={[remSt.timeChip, {
+                              borderColor: sel ? COLORS.orange : COLORS.cardBorder,
+                            }]}
                           >
-                            <Text style={[remSt.timeChipText, { color: sel ? COLORS.orange : COLORS.subtext }]}>{formatHour(h)}</Text>
+                            <Text style={[remSt.timeChipTxt, { color: sel ? COLORS.orange : COLORS.subtext }]}>
+                              {formatHour(h)}
+                            </Text>
                           </LinearGradient>
                         </PressScale>
                       );
@@ -3083,23 +3122,33 @@ const RemindersScreen = ({ reminderPrefs, onSave, onNavigate }) => {
 
                 <View style={remSt.timeDivider} />
 
-                {/* End Time */}
+                {/* End time */}
                 <View style={remSt.timeSection}>
                   <View style={remSt.timeLabelRow}>
                     <Ionicons name="moon-outline" size={16} color={COLORS.blue} />
                     <Text style={remSt.timeLabel}>End Time</Text>
                     <Text style={remSt.timeValue}>{formatHour(endHour)}</Text>
                   </View>
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={remSt.timeScroll}>
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={remSt.timeScroll}
+                  >
                     {endHours.map(h => {
                       const sel = endHour === h;
                       return (
                         <PressScale key={h} onPress={() => setEndHour(h)}>
                           <LinearGradient
-                            colors={sel ? [COLORS.blue + '33', COLORS.blue + '15'] : [COLORS.cardHover, COLORS.card]}
-                            style={[remSt.timeChip, { borderColor: sel ? COLORS.blue : COLORS.cardBorder }]}
+                            colors={sel
+                              ? ['rgba(79,142,247,0.25)', 'rgba(79,142,247,0.1)']
+                              : [COLORS.cardHover, COLORS.card]}
+                            style={[remSt.timeChip, {
+                              borderColor: sel ? COLORS.blue : COLORS.cardBorder,
+                            }]}
                           >
-                            <Text style={[remSt.timeChipText, { color: sel ? COLORS.blue : COLORS.subtext }]}>{formatHour(h)}</Text>
+                            <Text style={[remSt.timeChipTxt, { color: sel ? COLORS.blue : COLORS.subtext }]}>
+                              {formatHour(h)}
+                            </Text>
                           </LinearGradient>
                         </PressScale>
                       );
@@ -3109,7 +3158,7 @@ const RemindersScreen = ({ reminderPrefs, onSave, onNavigate }) => {
               </LinearGradient>
             </View>
 
-            {/* Preview */}
+            {/* Preview card */}
             <View style={remSt.previewCard}>
               <LinearGradient colors={['#0d1e3d', '#091226']} style={remSt.previewGrad}>
                 <View style={remSt.previewTopLine} />
@@ -3119,49 +3168,67 @@ const RemindersScreen = ({ reminderPrefs, onSave, onNavigate }) => {
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={remSt.previewTitle}>
-                      You'll get <Text style={{ color: COLORS.blue, fontWeight: '800' }}>{remindersCount}</Text> reminders today
+                      You'll get{' '}
+                      <Text style={{ color: COLORS.blue, fontWeight: '800' }}>
+                        {remindersCount}
+                      </Text>
+                      {' '}reminders today
                     </Text>
                     <Text style={remSt.previewSub}>
-                      Between {formatHour(startHour)} and {formatHour(endHour)}, every {interval >= 60 ? `${interval / 60}h` : `${interval}m`}
+                      Between {formatHour(startHour)} and {formatHour(endHour)},{' '}
+                      every {interval >= 60 ? `${interval / 60}h` : `${interval}m`}
                     </Text>
                   </View>
                 </View>
-                <View style={remSt.previewTimeline}>
+
+                {/* Timeline dots */}
+                <View style={remSt.timeline}>
                   {Array.from({ length: Math.min(remindersCount, 8) }).map((_, i) => (
-                    <View key={i} style={remSt.previewDot}>
-                      <LinearGradient colors={[COLORS.blue, COLORS.cyan]} style={remSt.previewDotInner} />
+                    <View key={i} style={remSt.timelineDot}>
+                      <LinearGradient
+                        colors={[COLORS.blue, COLORS.cyan]}
+                        style={{ flex: 1 }}
+                      />
                     </View>
                   ))}
                   {remindersCount > 8 && (
-                    <Text style={{ ...TYPOGRAPHY.caption, color: COLORS.subtext, marginLeft: 4 }}>+{remindersCount - 8} more</Text>
+                    <Text style={{ ...TYPOGRAPHY.caption, color: COLORS.subtext, marginLeft: 4 }}>
+                      +{remindersCount - 8} more
+                    </Text>
                   )}
                 </View>
               </LinearGradient>
             </View>
           </Animated.View>
 
-          {/* Save Button */}
-          <Animated.View style={[remSt.saveWrap, { transform: [{ scale: saveScale }] }]}>
-            <PressScale onPress={handleSave} style={remSt.saveBtn}>
-              <LinearGradient colors={saving ? [COLORS.cardHover, COLORS.card] : [COLORS.blue, COLORS.blueDim]} style={remSt.saveBtnGrad}>
-                {saving ? (
-                  <ActivityIndicator color={COLORS.blue} size="small" />
-                ) : (
-                  <>
-                    <Ionicons name="checkmark-circle" size={20} color={COLORS.white} />
-                    <Text style={remSt.saveBtnText}>Save Reminders</Text>
-                  </>
-                )}
-              </LinearGradient>
-            </PressScale>
-          </Animated.View>
+          {/* Save button */}
+          <PressScale onPress={handleSave} style={remSt.saveBtn}>
+            <LinearGradient
+              colors={saving
+                ? [COLORS.cardHover, COLORS.card]
+                : [COLORS.blue, COLORS.blueDim]}
+              style={remSt.saveBtnGrad}
+            >
+              {saving ? (
+                <ActivityIndicator color={COLORS.blue} size="small" />
+              ) : (
+                <>
+                  <Ionicons name="checkmark-circle" size={20} color={COLORS.white} />
+                  <Text style={remSt.saveBtnTxt}>Save Reminders</Text>
+                </>
+              )}
+            </LinearGradient>
+          </PressScale>
 
-          {/* Saved confirmation */}
+          {/* Saved banner */}
           {saved && (
             <Animated.View style={[remSt.savedBanner, { opacity: savedOp }]}>
-              <LinearGradient colors={[COLORS.green + '22', COLORS.green + '0a']} style={remSt.savedBannerGrad}>
+              <LinearGradient
+                colors={['rgba(0,230,118,0.18)', 'rgba(0,230,118,0.06)']}
+                style={remSt.savedBannerGrad}
+              >
                 <Ionicons name="checkmark-circle" size={16} color={COLORS.green} />
-                <Text style={remSt.savedBannerText}>Reminders saved successfully!</Text>
+                <Text style={remSt.savedBannerTxt}>Reminders saved successfully!</Text>
               </LinearGradient>
             </Animated.View>
           )}
@@ -3174,48 +3241,53 @@ const RemindersScreen = ({ reminderPrefs, onSave, onNavigate }) => {
 };
 
 const remSt = StyleSheet.create({
-  scroll: { paddingHorizontal: SPACING.md, paddingTop: SPACING.xs },
-  pageHdr: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: SPACING.sm, marginBottom: SPACING.lg },
-  pageTitle: { ...TYPOGRAPHY.h1, color: COLORS.text },
-  pageSub: { ...TYPOGRAPHY.caption, color: COLORS.subtext, marginTop: 2 },
-  headerIcon: { borderRadius: RADIUS.md, overflow: 'hidden', borderWidth: 1 },
-  card: { borderRadius: RADIUS.lg, overflow: 'hidden', borderWidth: 1, borderColor: COLORS.cardBorder, marginBottom: SPACING.md },
-  cardGrad: { padding: SPACING.md },
-  toggleRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.md },
+  scroll:       { paddingHorizontal: SPACING.md, paddingTop: SPACING.xs },
+  pageHdr:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: SPACING.sm, marginBottom: SPACING.lg },
+  pageTitle:    { ...TYPOGRAPHY.h1, color: COLORS.text },
+  pageSub:      { ...TYPOGRAPHY.caption, color: COLORS.subtext, marginTop: 2 },
+  headerIcon:   { borderRadius: RADIUS.md, overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(79,142,247,0.3)' },
+  card:         { borderRadius: RADIUS.lg, overflow: 'hidden', borderWidth: 1, borderColor: COLORS.cardBorder, marginBottom: SPACING.md },
+  cardGrad:     { padding: SPACING.md },
+  toggleRow:    { flexDirection: 'row', alignItems: 'center', gap: SPACING.md },
   settingTitle: { ...TYPOGRAPHY.body, fontWeight: '600', color: COLORS.text },
-  settingDesc: { ...TYPOGRAPHY.caption, color: COLORS.subtext, marginTop: 2 },
-  sectionHdr: { flexDirection: 'row', alignItems: 'center', marginBottom: SPACING.sm, gap: SPACING.sm },
+  settingDesc:  { ...TYPOGRAPHY.caption, color: COLORS.subtext, marginTop: 2 },
+  sectionHdr:   { flexDirection: 'row', alignItems: 'center', marginBottom: SPACING.sm, gap: SPACING.sm },
   sectionTitle: { ...TYPOGRAPHY.label, color: COLORS.subtext, flexShrink: 0 },
-  sectionLine: { flex: 1, height: 1, backgroundColor: COLORS.blue + '30' },
+  sectionLine:  { flex: 1, height: 1, backgroundColor: 'rgba(79,142,247,0.25)' },
   intervalGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.sm },
-  intervalBtn: { width: (DEVICE.width - SPACING.md * 2 - SPACING.md * 2 - SPACING.sm) / 2, borderRadius: RADIUS.md, overflow: 'hidden' },
-  intervalBtnGrad: { paddingVertical: SPACING.md, paddingHorizontal: SPACING.sm, alignItems: 'center', gap: SPACING.xs, borderWidth: 1.5, borderRadius: RADIUS.md },
+  intervalBtn:  {
+    width: (DEVICE.width - SPACING.md * 2 - SPACING.md * 2 - SPACING.sm) / 2,
+    borderRadius: RADIUS.md, overflow: 'hidden',
+  },
+  intervalBtnGrad: {
+    paddingVertical: SPACING.md, paddingHorizontal: SPACING.sm,
+    alignItems: 'center', gap: SPACING.xs,
+    borderWidth: 1.5, borderRadius: RADIUS.md,
+  },
   intervalLabel: { ...TYPOGRAPHY.body, fontWeight: '600', fontSize: 13 },
-  timeSection: { gap: SPACING.sm },
-  timeLabelRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.xs },
-  timeLabel: { ...TYPOGRAPHY.body, fontWeight: '600', color: COLORS.text, flex: 1 },
-  timeValue: { ...TYPOGRAPHY.label, color: COLORS.blue, fontSize: 11 },
-  timeScroll: { gap: SPACING.sm, paddingVertical: SPACING.xs },
-  timeChip: { paddingHorizontal: SPACING.md, paddingVertical: SPACING.sm, borderRadius: RADIUS.round, borderWidth: 1.5 },
-  timeChipText: { ...TYPOGRAPHY.body, fontWeight: '600', fontSize: 12 },
-  timeDivider: { height: 1, backgroundColor: COLORS.cardBorder, marginVertical: SPACING.md },
-  previewCard: { borderRadius: RADIUS.lg, overflow: 'hidden', borderWidth: 1.5, borderColor: COLORS.blue + '44', marginBottom: SPACING.md, ...SHADOWS.blue },
-  previewGrad: { padding: SPACING.md, gap: SPACING.sm },
-  previewTopLine: { position: 'absolute', top: 0, left: 0, right: 0, height: 2, backgroundColor: COLORS.blue, opacity: 0.6 },
-  previewRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.md },
-  previewIconBg: { width: 48, height: 48, borderRadius: 24, backgroundColor: COLORS.blue + '18', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: COLORS.blue + '33' },
-  previewTitle: { ...TYPOGRAPHY.body, fontWeight: '600', color: COLORS.text },
-  previewSub: { ...TYPOGRAPHY.caption, color: COLORS.subtext, marginTop: 2 },
-  previewTimeline: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8, paddingTop: SPACING.xs },
-  previewDot: { width: 12, height: 12, borderRadius: 6, overflow: 'hidden' },
-  previewDotInner: { flex: 1 },
-  saveWrap: { borderRadius: RADIUS.lg, overflow: 'hidden', marginBottom: SPACING.md, ...SHADOWS.blue },
-  saveBtn: { borderRadius: RADIUS.lg, overflow: 'hidden' },
-  saveBtnGrad: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: SPACING.md + 2, gap: SPACING.sm },
-  saveBtnText: { ...TYPOGRAPHY.body, fontWeight: '800', color: COLORS.white, fontSize: 16 },
-  savedBanner: { borderRadius: RADIUS.md, overflow: 'hidden', borderWidth: 1, borderColor: COLORS.green + '33', marginBottom: SPACING.md },
+  timeSection:   { gap: SPACING.sm },
+  timeLabelRow:  { flexDirection: 'row', alignItems: 'center', gap: SPACING.xs },
+  timeLabel:     { ...TYPOGRAPHY.body, fontWeight: '600', color: COLORS.text, flex: 1 },
+  timeValue:     { ...TYPOGRAPHY.label, color: COLORS.blue, fontSize: 11 },
+  timeScroll:    { gap: SPACING.sm, paddingVertical: SPACING.xs },
+  timeChip:      { paddingHorizontal: SPACING.md, paddingVertical: SPACING.sm, borderRadius: RADIUS.round, borderWidth: 1.5 },
+  timeChipTxt:   { ...TYPOGRAPHY.body, fontWeight: '600', fontSize: 12 },
+  timeDivider:   { height: 1, backgroundColor: COLORS.cardBorder, marginVertical: SPACING.md },
+  previewCard:   { borderRadius: RADIUS.lg, overflow: 'hidden', borderWidth: 1.5, borderColor: 'rgba(79,142,247,0.4)', marginBottom: SPACING.md, ...SHADOWS.blue },
+  previewGrad:   { padding: SPACING.md, gap: SPACING.sm },
+  previewTopLine:{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, backgroundColor: COLORS.blue, opacity: 0.6 },
+  previewRow:    { flexDirection: 'row', alignItems: 'center', gap: SPACING.md },
+  previewIconBg: { width: 48, height: 48, borderRadius: 24, backgroundColor: 'rgba(79,142,247,0.15)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(79,142,247,0.3)' },
+  previewTitle:  { ...TYPOGRAPHY.body, fontWeight: '600', color: COLORS.text },
+  previewSub:    { ...TYPOGRAPHY.caption, color: COLORS.subtext, marginTop: 2 },
+  timeline:      { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8, paddingTop: SPACING.xs },
+  timelineDot:   { width: 12, height: 12, borderRadius: 6, overflow: 'hidden' },
+  saveBtn:       { borderRadius: RADIUS.lg, overflow: 'hidden', marginBottom: SPACING.md, ...SHADOWS.blue },
+  saveBtnGrad:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: SPACING.md + 2, gap: SPACING.sm },
+  saveBtnTxt:    { ...TYPOGRAPHY.body, fontWeight: '800', color: COLORS.white, fontSize: 16 },
+  savedBanner:   { borderRadius: RADIUS.md, overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(0,230,118,0.3)', marginBottom: SPACING.md },
   savedBannerGrad: { flexDirection: 'row', alignItems: 'center', padding: SPACING.md, gap: SPACING.sm },
-  savedBannerText: { ...TYPOGRAPHY.body, color: COLORS.green, fontWeight: '600' },
+  savedBannerTxt:  { ...TYPOGRAPHY.body, color: COLORS.green, fontWeight: '600' },
 });
 
 // ============================================================
@@ -3223,17 +3295,20 @@ const remSt = StyleSheet.create({
 // ============================================================
 const SettingsScreen = ({ profile, onSaveProfile, onNavigate, onResetOnboarding }) => {
   const insets = useSafeAreaInsets();
-  const [name, setName] = useState(profile?.name ?? '');
-  const [weight, setWeight] = useState(String(profile?.weight ?? 70));
-  const [goal, setGoal] = useState(profile?.dailyGoal ?? 2500);
-  const [saving, setSaving] = useState(false);
 
-  const headerY = useRef(new Animated.Value(-20)).current;
+  const [name,   setName]   = useState(profile?.name       ?? '');
+  const [weight, setWeight] = useState(String(profile?.weight ?? 70));
+  const [goal,   setGoal]   = useState(profile?.dailyGoal  ?? 2500);
+  const [saving, setSaving] = useState(false);
+  const [saved,  setSaved]  = useState(false);
+
+  const headerY  = useRef(new Animated.Value(-20)).current;
   const headerOp = useRef(new Animated.Value(0)).current;
+  const savedOp  = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     Animated.parallel([
-      Animated.timing(headerY, { toValue: 0, duration: 500, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+      Animated.timing(headerY,  { toValue: 0, duration: 500, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
       Animated.timing(headerOp, { toValue: 1, duration: 500, useNativeDriver: true }),
     ]).start();
   }, []);
@@ -3241,85 +3316,117 @@ const SettingsScreen = ({ profile, onSaveProfile, onNavigate, onResetOnboarding 
   const handleSave = async () => {
     setSaving(true);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    const updated = { ...profile, name: name.trim() || 'Friend', weight: parseFloat(weight) || 70, dailyGoal: goal };
-    try { await AsyncStorage.setItem(STORAGE_KEYS.USER_PROFILE, JSON.stringify(updated)); } catch (_) {}
+    const updated = {
+      ...profile,
+      name:       name.trim() || 'Friend',
+      weight:     parseFloat(weight) || 70,
+      dailyGoal:  goal,
+    };
+    try {
+      await AsyncStorage.setItem(STORAGE_KEYS.USER_PROFILE, JSON.stringify(updated));
+    } catch (_) {}
     onSaveProfile?.(updated);
-    setTimeout(() => setSaving(false), 800);
+    setSaving(false);
+    setSaved(true);
+    Animated.timing(savedOp, { toValue: 1, duration: 300, useNativeDriver: true }).start();
+    setTimeout(() => {
+      Animated.timing(savedOp, { toValue: 0, duration: 300, useNativeDriver: true })
+        .start(() => setSaved(false));
+    }, 2200);
   };
-
-  const SettingRow = ({ icon, label, value, color = COLORS.blue, onPress }) => (
-    <PressScale onPress={onPress} style={settSt.settingRow}>
-      <LinearGradient colors={[COLORS.card, COLORS.bg]} style={settSt.settingRowGrad}>
-        <View style={[settSt.settingIcon, { backgroundColor: color + '18' }]}>
-          <Ionicons name={icon} size={18} color={color} />
-        </View>
-        <Text style={settSt.settingLabel}>{label}</Text>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: SPACING.xs }}>
-          {value && <Text style={settSt.settingValue}>{value}</Text>}
-          <Ionicons name="chevron-forward" size={16} color={COLORS.subtextDim} />
-        </View>
-      </LinearGradient>
-    </PressScale>
-  );
 
   return (
     <View style={{ flex: 1, backgroundColor: COLORS.bg }}>
       <StatusBar barStyle="light-content" />
       <SafeAreaView style={{ flex: 1 }}>
-        <ScrollView contentContainerStyle={[settSt.scroll, { paddingBottom: 90 + insets.bottom }]} showsVerticalScrollIndicator={false}>
-
-          <Animated.View style={[settSt.pageHdr, { transform: [{ translateY: headerY }], opacity: headerOp }]}>
-            <View>
-              <Text style={settSt.pageTitle}>Settings</Text>
-              <Text style={settSt.pageSub}>Customise your HydroTrack experience</Text>
-            </View>
+        <ScrollView
+          contentContainerStyle={[settSt.scroll, { paddingBottom: 90 + insets.bottom }]}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Header */}
+          <Animated.View style={[{ paddingTop: SPACING.sm, marginBottom: SPACING.lg }, {
+            transform: [{ translateY: headerY }], opacity: headerOp,
+          }]}>
+            <Text style={settSt.pageTitle}>Settings</Text>
+            <Text style={settSt.pageSub}>Customise your HydroTrack experience</Text>
           </Animated.View>
 
-          {/* Profile Card */}
+          {/* Profile card */}
           <View style={settSt.profileCard}>
             <LinearGradient colors={['#0d1e3d', '#091226']} style={settSt.profileGrad}>
               <View style={settSt.profileTopLine} />
               <View style={settSt.avatarLarge}>
-                <LinearGradient colors={[COLORS.blue + '44', COLORS.blue + '22']} style={settSt.avatarGrad}>
-                  <Text style={{ fontSize: 32 }}>{name.charAt(0).toUpperCase() || '💧'}</Text>
+                <LinearGradient
+                  colors={['rgba(79,142,247,0.4)', 'rgba(79,142,247,0.2)']}
+                  style={{ width: 80, height: 80, alignItems: 'center', justifyContent: 'center' }}
+                >
+                  <Text style={{ fontSize: 32 }}>
+                    {(name || profile?.name || '?').charAt(0).toUpperCase()}
+                  </Text>
                 </LinearGradient>
               </View>
-              <Text style={settSt.profileName}>{name || 'Hydration Hero'}</Text>
+              <Text style={settSt.profileName}>{name || profile?.name || 'Hydration Hero'}</Text>
               <Text style={settSt.profileGoal}>Daily goal: {formatML(goal)}</Text>
             </LinearGradient>
           </View>
 
-          {/* Profile Fields */}
-          <View style={settSt.sectionHdr}><Text style={settSt.sectionTitle}>Profile</Text><View style={settSt.sectionLine} /></View>
+          {/* Profile fields */}
+          <View style={settSt.sectionHdr}>
+            <Text style={settSt.sectionTitle}>Profile</Text>
+            <View style={settSt.sectionLine} />
+          </View>
           <View style={settSt.card}>
             <LinearGradient colors={[COLORS.card, COLORS.bg]} style={settSt.cardGrad}>
               <AnimatedInput value={name} onChangeText={setName} placeholder="Your name" />
               <View style={{ height: SPACING.md }} />
-              <AnimatedInput value={weight} onChangeText={v => { if (/^\d*\.?\d*$/.test(v)) setWeight(v); }} placeholder="Body weight" suffix="kg" keyboardType="decimal-pad" />
+              <AnimatedInput
+                value={weight}
+                onChangeText={v => { if (/^\d*\.?\d*$/.test(v)) setWeight(v); }}
+                placeholder="Body weight"
+                suffix="kg"
+                keyboardType="decimal-pad"
+              />
             </LinearGradient>
           </View>
 
-          {/* Daily Goal */}
-          <View style={settSt.sectionHdr}><Text style={settSt.sectionTitle}>Daily Goal</Text><View style={settSt.sectionLine} /></View>
+          {/* Daily goal */}
+          <View style={settSt.sectionHdr}>
+            <Text style={settSt.sectionTitle}>Daily Goal</Text>
+            <View style={settSt.sectionLine} />
+          </View>
           <View style={settSt.card}>
             <LinearGradient colors={[COLORS.card, COLORS.bg]} style={settSt.cardGrad}>
               <Text style={settSt.goalLabel}>Target daily intake</Text>
               <View style={settSt.goalRow}>
                 <PressScale onPress={() => setGoal(g => Math.max(1000, g - 250))}>
-                  <View style={settSt.goalStepBtn}><Ionicons name="remove" size={22} color={COLORS.blue} /></View>
+                  <View style={settSt.goalStepBtn}>
+                    <Ionicons name="remove" size={22} color={COLORS.blue} />
+                  </View>
                 </PressScale>
-                <LinearGradient colors={[COLORS.blue + '18', COLORS.blue + '08']} style={settSt.goalDisplay}>
+                <LinearGradient
+                  colors={['rgba(79,142,247,0.15)', 'rgba(79,142,247,0.06)']}
+                  style={settSt.goalDisplay}
+                >
                   <Text style={settSt.goalNum}>{formatML(goal)}</Text>
                 </LinearGradient>
                 <PressScale onPress={() => setGoal(g => Math.min(6000, g + 250))}>
-                  <View style={settSt.goalStepBtn}><Ionicons name="add" size={22} color={COLORS.blue} /></View>
+                  <View style={settSt.goalStepBtn}>
+                    <Ionicons name="add" size={22} color={COLORS.blue} />
+                  </View>
                 </PressScale>
               </View>
-              <View style={settSt.goalPresets}>
+
+              {/* Presets */}
+              <View style={settSt.presetsRow}>
                 {[1500, 2000, 2500, 3000].map(g => (
                   <PressScale key={g} onPress={() => setGoal(g)}>
-                    <View style={[settSt.goalPreset, { borderColor: goal === g ? COLORS.blue : COLORS.cardBorder, backgroundColor: goal === g ? COLORS.blue + '18' : COLORS.cardHover }]}>
-                      <Text style={[settSt.goalPresetText, { color: goal === g ? COLORS.blue : COLORS.subtext }]}>{formatML(g)}</Text>
+                    <View style={[settSt.preset, {
+                      borderColor: goal === g ? COLORS.blue : COLORS.cardBorder,
+                      backgroundColor: goal === g ? 'rgba(79,142,247,0.15)' : COLORS.cardHover,
+                    }]}>
+                      <Text style={[settSt.presetTxt, { color: goal === g ? COLORS.blue : COLORS.subtext }]}>
+                        {formatML(g)}
+                      </Text>
                     </View>
                   </PressScale>
                 ))}
@@ -3327,45 +3434,75 @@ const SettingsScreen = ({ profile, onSaveProfile, onNavigate, onResetOnboarding 
             </LinearGradient>
           </View>
 
-          {/* Save */}
+          {/* Save profile */}
           <PressScale onPress={handleSave} style={settSt.saveBtn}>
             <LinearGradient colors={[COLORS.blue, COLORS.blueDim]} style={settSt.saveBtnGrad}>
-              {saving ? <ActivityIndicator color={COLORS.white} size="small" /> : (
-                <><Ionicons name="save-outline" size={18} color={COLORS.white} /><Text style={settSt.saveBtnText}>Save Profile</Text></>
-              )}
+              {saving
+                ? <ActivityIndicator color={COLORS.white} size="small" />
+                : (
+                  <>
+                    <Ionicons name="save-outline" size={18} color={COLORS.white} />
+                    <Text style={settSt.saveBtnTxt}>Save Profile</Text>
+                  </>
+                )}
             </LinearGradient>
           </PressScale>
 
+          {/* Saved confirmation */}
+          {saved && (
+            <Animated.View style={[settSt.savedBanner, { opacity: savedOp }]}>
+              <LinearGradient
+                colors={['rgba(0,230,118,0.18)', 'rgba(0,230,118,0.06)']}
+                style={settSt.savedBannerGrad}
+              >
+                <Ionicons name="checkmark-circle" size={16} color={COLORS.green} />
+                <Text style={{ ...TYPOGRAPHY.body, color: COLORS.green, fontWeight: '600' }}>
+                  Profile saved!
+                </Text>
+              </LinearGradient>
+            </Animated.View>
+          )}
+
           {/* App info */}
-          <View style={settSt.sectionHdr}><Text style={settSt.sectionTitle}>App Info</Text><View style={settSt.sectionLine} /></View>
+          <View style={settSt.sectionHdr}>
+            <Text style={settSt.sectionTitle}>App Info</Text>
+            <View style={settSt.sectionLine} />
+          </View>
           <View style={settSt.infoCard}>
             <LinearGradient colors={[COLORS.card, COLORS.bg]} style={settSt.cardGrad}>
               {[
-                { icon: 'water', label: 'App Name', value: 'HydroTrack', color: COLORS.blue },
-                { icon: 'code-slash', label: 'Version', value: APP_CONFIG.version, color: COLORS.purple },
-                { icon: 'shield-checkmark', label: 'Privacy', value: 'All data stored locally', color: COLORS.green },
+                { icon: 'water',            label: 'App',     value: 'HydroTrack',              color: COLORS.blue   },
+                { icon: 'code-slash',        label: 'Version', value: APP_CONFIG.version,         color: COLORS.purple },
+                { icon: 'shield-checkmark',  label: 'Privacy', value: 'Data stored locally',      color: COLORS.green  },
               ].map(item => (
                 <View key={item.label} style={settSt.infoRow}>
-                  <View style={[settSt.settingIcon, { backgroundColor: item.color + '18' }]}>
+                  <View style={[settSt.infoIcon, { backgroundColor: item.color + '18' }]}>
                     <Ionicons name={item.icon} size={16} color={item.color} />
                   </View>
-                  <Text style={settSt.settingLabel}>{item.label}</Text>
-                  <Text style={settSt.settingValue}>{item.value}</Text>
+                  <Text style={settSt.infoLabel}>{item.label}</Text>
+                  <Text style={settSt.infoValue}>{item.value}</Text>
                 </View>
               ))}
             </LinearGradient>
           </View>
 
           {/* Reset */}
-          <PressScale onPress={() => {
-            Alert.alert('Reset App', 'This will clear all data and restart onboarding. Are you sure?', [
-              { text: 'Cancel', style: 'cancel' },
-              { text: 'Reset', style: 'destructive', onPress: onResetOnboarding },
-            ]);
-          }} style={settSt.resetBtn}>
+          <PressScale
+            onPress={() =>
+              Alert.alert(
+                'Reset App',
+                'This will clear all data and restart onboarding. Are you sure?',
+                [
+                  { text: 'Cancel', style: 'cancel' },
+                  { text: 'Reset', style: 'destructive', onPress: onResetOnboarding },
+                ]
+              )
+            }
+            style={settSt.resetBtn}
+          >
             <View style={settSt.resetBtnInner}>
               <Ionicons name="refresh-outline" size={16} color={COLORS.red} />
-              <Text style={settSt.resetBtnText}>Reset & Restart Onboarding</Text>
+              <Text style={settSt.resetBtnTxt}>Reset &amp; Restart Onboarding</Text>
             </View>
           </PressScale>
 
@@ -3377,56 +3514,53 @@ const SettingsScreen = ({ profile, onSaveProfile, onNavigate, onResetOnboarding 
 };
 
 const settSt = StyleSheet.create({
-  scroll: { paddingHorizontal: SPACING.md, paddingTop: SPACING.xs },
-  pageHdr: { paddingTop: SPACING.sm, marginBottom: SPACING.lg },
-  pageTitle: { ...TYPOGRAPHY.h1, color: COLORS.text },
-  pageSub: { ...TYPOGRAPHY.caption, color: COLORS.subtext, marginTop: 2 },
-  profileCard: { borderRadius: RADIUS.xl, overflow: 'hidden', borderWidth: 1.5, borderColor: COLORS.blue + '44', marginBottom: SPACING.lg, ...SHADOWS.blue },
-  profileGrad: { padding: SPACING.lg, alignItems: 'center', gap: SPACING.sm },
+  scroll:       { paddingHorizontal: SPACING.md, paddingTop: SPACING.xs },
+  pageTitle:    { ...TYPOGRAPHY.h1, color: COLORS.text },
+  pageSub:      { ...TYPOGRAPHY.caption, color: COLORS.subtext, marginTop: 2 },
+  profileCard:  { borderRadius: RADIUS.xl, overflow: 'hidden', borderWidth: 1.5, borderColor: 'rgba(79,142,247,0.4)', marginBottom: SPACING.lg, ...SHADOWS.blue },
+  profileGrad:  { padding: SPACING.lg, alignItems: 'center', gap: SPACING.sm },
   profileTopLine: { position: 'absolute', top: 0, left: 0, right: 0, height: 2, backgroundColor: COLORS.blue, opacity: 0.6 },
-  avatarLarge: { borderRadius: 50, overflow: 'hidden', borderWidth: 2, borderColor: COLORS.blue + '55' },
-  avatarGrad: { width: 80, height: 80, alignItems: 'center', justifyContent: 'center' },
-  profileName: { ...TYPOGRAPHY.h1, color: COLORS.text },
-  profileGoal: { ...TYPOGRAPHY.body, color: COLORS.subtext },
-  sectionHdr: { flexDirection: 'row', alignItems: 'center', marginBottom: SPACING.sm, gap: SPACING.sm },
+  avatarLarge:  { borderRadius: 50, overflow: 'hidden', borderWidth: 2, borderColor: 'rgba(79,142,247,0.5)' },
+  profileName:  { ...TYPOGRAPHY.h1, color: COLORS.text },
+  profileGoal:  { ...TYPOGRAPHY.body, color: COLORS.subtext },
+  sectionHdr:   { flexDirection: 'row', alignItems: 'center', marginBottom: SPACING.sm, gap: SPACING.sm },
   sectionTitle: { ...TYPOGRAPHY.label, color: COLORS.subtext, flexShrink: 0 },
-  sectionLine: { flex: 1, height: 1, backgroundColor: COLORS.blue + '30' },
-  card: { borderRadius: RADIUS.lg, overflow: 'hidden', borderWidth: 1, borderColor: COLORS.cardBorder, marginBottom: SPACING.md },
-  infoCard: { borderRadius: RADIUS.lg, overflow: 'hidden', borderWidth: 1, borderColor: COLORS.cardBorder, marginBottom: SPACING.md },
-  cardGrad: { padding: SPACING.md },
-  goalLabel: { ...TYPOGRAPHY.label, color: COLORS.blue, textAlign: 'center', marginBottom: SPACING.md },
-  goalRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.md, marginBottom: SPACING.md },
-  goalStepBtn: { width: 48, height: 48, borderRadius: RADIUS.md, backgroundColor: COLORS.cardHover, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: COLORS.cardBorder },
-  goalDisplay: { flex: 1, alignItems: 'center', paddingVertical: SPACING.md, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.blue + '44' },
-  goalNum: { ...TYPOGRAPHY.h1, color: COLORS.blue },
-  goalPresets: { flexDirection: 'row', gap: SPACING.sm },
-  goalPreset: { flex: 1, alignItems: 'center', paddingVertical: SPACING.sm, borderRadius: RADIUS.md, borderWidth: 1 },
-  goalPresetText: { ...TYPOGRAPHY.caption, fontWeight: '700', fontSize: 11 },
-  saveBtn: { borderRadius: RADIUS.lg, overflow: 'hidden', marginBottom: SPACING.lg, ...SHADOWS.blue },
-  saveBtnGrad: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: SPACING.md + 2, gap: SPACING.sm },
-  saveBtnText: { ...TYPOGRAPHY.body, fontWeight: '800', color: COLORS.white, fontSize: 16 },
-  settingRow: { borderRadius: RADIUS.md, overflow: 'hidden', marginBottom: SPACING.sm },
-  settingRowGrad: { flexDirection: 'row', alignItems: 'center', padding: SPACING.md, gap: SPACING.md },
-  settingIcon: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  settingLabel: { ...TYPOGRAPHY.body, color: COLORS.text, flex: 1 },
-  settingValue: { ...TYPOGRAPHY.caption, color: COLORS.subtext },
-  infoRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.md, paddingVertical: SPACING.sm, borderBottomWidth: 1, borderBottomColor: COLORS.cardBorder + '55' },
-  resetBtn: { borderRadius: RADIUS.md, overflow: 'hidden', borderWidth: 1, borderColor: COLORS.red + '33', marginBottom: SPACING.lg },
-  resetBtnInner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', padding: SPACING.md, gap: SPACING.sm, backgroundColor: COLORS.red + '0a' },
-  resetBtnText: { ...TYPOGRAPHY.body, color: COLORS.red, fontWeight: '600' },
+  sectionLine:  { flex: 1, height: 1, backgroundColor: 'rgba(79,142,247,0.25)' },
+  card:         { borderRadius: RADIUS.lg, overflow: 'hidden', borderWidth: 1, borderColor: COLORS.cardBorder, marginBottom: SPACING.md },
+  infoCard:     { borderRadius: RADIUS.lg, overflow: 'hidden', borderWidth: 1, borderColor: COLORS.cardBorder, marginBottom: SPACING.md },
+  cardGrad:     { padding: SPACING.md },
+  goalLabel:    { ...TYPOGRAPHY.label, color: COLORS.blue, textAlign: 'center', marginBottom: SPACING.md },
+  goalRow:      { flexDirection: 'row', alignItems: 'center', gap: SPACING.md, marginBottom: SPACING.md },
+  goalStepBtn:  { width: 48, height: 48, borderRadius: RADIUS.md, backgroundColor: COLORS.cardHover, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: COLORS.cardBorder },
+  goalDisplay:  { flex: 1, alignItems: 'center', paddingVertical: SPACING.md, borderRadius: RADIUS.md, borderWidth: 1, borderColor: 'rgba(79,142,247,0.4)' },
+  goalNum:      { ...TYPOGRAPHY.h1, color: COLORS.blue },
+  presetsRow:   { flexDirection: 'row', gap: SPACING.sm },
+  preset:       { flex: 1, alignItems: 'center', paddingVertical: SPACING.sm, borderRadius: RADIUS.md, borderWidth: 1 },
+  presetTxt:    { ...TYPOGRAPHY.caption, fontWeight: '700', fontSize: 11 },
+  saveBtn:      { borderRadius: RADIUS.lg, overflow: 'hidden', marginBottom: SPACING.md, ...SHADOWS.blue },
+  saveBtnGrad:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: SPACING.md + 2, gap: SPACING.sm },
+  saveBtnTxt:   { ...TYPOGRAPHY.body, fontWeight: '800', color: COLORS.white, fontSize: 16 },
+  savedBanner:  { borderRadius: RADIUS.md, overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(0,230,118,0.3)', marginBottom: SPACING.md },
+  savedBannerGrad: { flexDirection: 'row', alignItems: 'center', padding: SPACING.md, gap: SPACING.sm },
+  infoRow:      { flexDirection: 'row', alignItems: 'center', gap: SPACING.md, paddingVertical: SPACING.sm, borderBottomWidth: 1, borderBottomColor: COLORS.cardBorder + '55' },
+  infoIcon:     { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  infoLabel:    { ...TYPOGRAPHY.body, color: COLORS.text, flex: 1 },
+  infoValue:    { ...TYPOGRAPHY.caption, color: COLORS.subtext },
+  resetBtn:     { borderRadius: RADIUS.md, overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(255,71,87,0.3)', marginBottom: SPACING.lg },
+  resetBtnInner:{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', padding: SPACING.md, gap: SPACING.sm, backgroundColor: 'rgba(255,71,87,0.06)' },
+  resetBtnTxt:  { ...TYPOGRAPHY.body, color: COLORS.red, fontWeight: '600' },
 });
-
 // ============================================================
 // ROOT APP
 // ============================================================
 export default function App() {
-  const [screen, setScreen] = useState(SCREENS.SPLASH);
-  const [profile, setProfile] = useState(null);
-  const [logs, setLogs] = useState({});
+  const [screen,        setScreen]        = useState(SCREENS.SPLASH);
+  const [profile,       setProfile]       = useState(null);
+  const [logs,          setLogs]          = useState({});
   const [reminderPrefs, setReminderPrefs] = useState(null);
-  const [streak, setStreak] = useState(0);
+  const [streak,        setStreak]        = useState(0);
 
-  // Load all data on mount
+  // ── Bootstrap ─────────────────────────────────────────────
   useEffect(() => {
     SoundEngine.init();
     loadData();
@@ -3440,83 +3574,154 @@ export default function App() {
         AsyncStorage.getItem(STORAGE_KEYS.ONBOARDED),
         AsyncStorage.getItem(STORAGE_KEYS.REMINDER_PREFS),
       ]);
-      if (profileStr) setProfile(JSON.parse(profileStr));
-      if (logsStr) { const l = JSON.parse(logsStr); setLogs(l); setStreak(calcStreak(l, JSON.parse(profileStr)?.dailyGoal ?? 2500)); }
-      if (reminderStr) setReminderPrefs(JSON.parse(reminderStr));
-      // Note: splash always shows, then routes appropriately
+
+      const parsedProfile  = profileStr  ? JSON.parse(profileStr)  : null;
+      const parsedLogs     = logsStr     ? JSON.parse(logsStr)     : {};
+      const parsedReminder = reminderStr ? JSON.parse(reminderStr) : null;
+
+      if (parsedProfile)  setProfile(parsedProfile);
+      if (parsedReminder) setReminderPrefs(parsedReminder);
+
+      setLogs(parsedLogs);
+      if (parsedProfile) {
+        setStreak(calcStreak(parsedLogs, parsedProfile.dailyGoal ?? APP_CONFIG.defaultGoal));
+      }
+
+      // Splash always plays; route afterward
+      // (handleSplashFinish reads profile state)
     } catch (_) {}
   };
 
-  const calcStreak = (logData, goal) => {
-    let s = 0;
-    const days = getLastNDays(90);
-    for (let i = days.length - 1; i >= 0; i--) {
-      if ((logData[days[i]]?.total ?? 0) >= goal) s++;
-      else if (days[i] < getTodayKey()) break;
-    }
-    return s;
-  };
-
+  // ── Navigation ────────────────────────────────────────────
   const handleSplashFinish = useCallback(() => {
-    setScreen(profile ? SCREENS.HOME : SCREENS.ONBOARDING);
-  }, [profile]);
+    setScreen(prev => {
+      // profile state may not be set yet — use functional update to read latest
+      return prev; // we navigate via the effect below
+    });
+  }, []);
+
+  // Route after splash using a ref so we always read fresh profile
+  const profileRef = useRef(profile);
+  profileRef.current = profile;
+  const splashDoneRef = useRef(false);
+
+  const handleSplashDone = useCallback(() => {
+    splashDoneRef.current = true;
+    setScreen(profileRef.current ? SCREENS.HOME : SCREENS.ONBOARDING);
+  }, []);
 
   const handleOnboardingComplete = useCallback((p) => {
     setProfile(p);
     setScreen(SCREENS.HOME);
   }, []);
 
+  const handleNavigate = useCallback((s) => setScreen(s), []);
+
+  // ── Add water ─────────────────────────────────────────────
   const handleAddWater = useCallback(async (ml) => {
     const today = getTodayKey();
     const entry = { ml, type: 'Water', time: new Date().toISOString(), id: Date.now() };
+
     setLogs(prev => {
-      const dayLog = prev[today] ?? { total: 0, entries: [] };
-      const updated = { ...prev, [today]: { total: dayLog.total + ml, entries: [...dayLog.entries, entry] } };
+      const dayLog  = prev[today] ?? { total: 0, entries: [] };
+      const updated = {
+        ...prev,
+        [today]: {
+          total:   dayLog.total + ml,
+          entries: [...dayLog.entries, entry],
+        },
+      };
+      // persist async
       AsyncStorage.setItem(STORAGE_KEYS.DAILY_LOGS, JSON.stringify(updated)).catch(() => {});
-      const newStreak = calcStreak(updated, profile?.dailyGoal ?? 2500);
-      setStreak(newStreak);
+      // update streak
+      const goal = profileRef.current?.dailyGoal ?? APP_CONFIG.defaultGoal;
+      setStreak(calcStreak(updated, goal));
       return updated;
     });
-  }, [profile]);
+  }, []);
 
-  const handleNavigate = useCallback((s) => setScreen(s), []);
-
+  // ── Save profile ──────────────────────────────────────────
   const handleSaveProfile = useCallback((p) => setProfile(p), []);
 
+  // ── Save reminders ────────────────────────────────────────
   const handleSaveReminders = useCallback((prefs) => setReminderPrefs(prefs), []);
 
+  // ── Refresh (pull-to-refresh on History) ─────────────────
   const handleRefresh = useCallback(async () => {
     await loadData();
   }, []);
 
+  // ── Reset all data ────────────────────────────────────────
   const handleReset = useCallback(async () => {
     try {
       await AsyncStorage.multiRemove(Object.values(STORAGE_KEYS));
-      setProfile(null); setLogs({}); setStreak(0); setReminderPrefs(null);
-      setScreen(SCREENS.ONBOARDING);
     } catch (_) {}
+    setProfile(null);
+    setLogs({});
+    setStreak(0);
+    setReminderPrefs(null);
+    setScreen(SCREENS.ONBOARDING);
   }, []);
 
+  // ── Derived values ────────────────────────────────────────
   const todayLog = logs[getTodayKey()] ?? { total: 0, entries: [] };
+
   const weeklyAvg = useMemo(() => {
-    const last7 = getLastNDays(7);
-    return Math.round(last7.reduce((s, k) => s + (logs[k]?.total ?? 0), 0) / 7);
+    const total = getLastNDays(7).reduce((s, k) => s + (logs[k]?.total ?? 0), 0);
+    return Math.round(total / 7);
   }, [logs]);
 
+  // ── Screen router ─────────────────────────────────────────
   const renderScreen = () => {
     switch (screen) {
       case SCREENS.SPLASH:
-        return <SplashScreen onFinish={handleSplashFinish} />;
+        return <SplashScreen onFinish={handleSplashDone} />;
+
       case SCREENS.ONBOARDING:
         return <OnboardingScreen onComplete={handleOnboardingComplete} />;
+
       case SCREENS.HOME:
-        return <HomeScreen profile={profile} todayLog={todayLog} onAddWater={handleAddWater} onNavigate={handleNavigate} streak={streak} weeklyAvg={weeklyAvg} allLogs={logs} />;
+        return (
+          <HomeScreen
+            profile={profile}
+            todayLog={todayLog}
+            onAddWater={handleAddWater}
+            onNavigate={handleNavigate}
+            streak={streak}
+            weeklyAvg={weeklyAvg}
+          />
+        );
+
       case SCREENS.HISTORY:
-        return <HistoryScreen logs={logs} goal={profile?.dailyGoal ?? APP_CONFIG.defaultGoal} profile={profile} streak={streak} onNavigate={handleNavigate} onRefresh={handleRefresh} />;
+        return (
+          <HistoryScreen
+            logs={logs}
+            goal={profile?.dailyGoal ?? APP_CONFIG.defaultGoal}
+            streak={streak}
+            onNavigate={handleNavigate}
+            onRefresh={handleRefresh}
+          />
+        );
+
       case SCREENS.REMINDERS:
-        return <RemindersScreen reminderPrefs={reminderPrefs} onSave={handleSaveReminders} onNavigate={handleNavigate} />;
+        return (
+          <RemindersScreen
+            reminderPrefs={reminderPrefs}
+            onSave={handleSaveReminders}
+            onNavigate={handleNavigate}
+          />
+        );
+
       case SCREENS.SETTINGS:
-        return <SettingsScreen profile={profile} onSaveProfile={handleSaveProfile} onNavigate={handleNavigate} onResetOnboarding={handleReset} />;
+        return (
+          <SettingsScreen
+            profile={profile}
+            onSaveProfile={handleSaveProfile}
+            onNavigate={handleNavigate}
+            onResetOnboarding={handleReset}
+          />
+        );
+
       default:
         return null;
     }
