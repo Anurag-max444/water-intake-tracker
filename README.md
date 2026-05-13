@@ -170,3 +170,4 @@ Full AI conversation logs are available in `/ai-logs/`.
 ---
 
 *Built with 💧 and Claude AI*
+
