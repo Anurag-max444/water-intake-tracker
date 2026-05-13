@@ -165,7 +165,7 @@ Full AI conversation logs are available in `/ai-logs/`.
 
 ## 👨‍💻 Developer
 
-**Ayush** — [@Anurag-max444](https://github.com/Anurag-max444)
+**Anurag** — [@Anurag-max444](https://github.com/Anurag-max444)
 
 ---
 
